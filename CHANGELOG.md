@@ -1,3 +1,9 @@
+## [1.0.0-dev.4](https://github.com/trustosas/trustosas-patches/compare/v1.0.0-dev.3...v1.0.0-dev.4) (2026-11-10)
+
+### 🐛 Bug Fixes
+
+* publish trustosas Patches source branding ([2c7219f](https://github.com/trustosas/trustosas-patches/commit/2c7219fd428ee0dd7ba520cd47e621c61385854c))
+
 ## [1.0.0-dev.3](https://github.com/trustosas/trustosas-patches/compare/v1.0.0-dev.2...v1.0.0-dev.3) (2026-11-10)
 
 ### 🐛 Bug Fixes
