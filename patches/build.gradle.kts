@@ -3,8 +3,8 @@ group = "app.template"
 patches {
     // TODO: Update this section with your project details.
     about {
-        name = "Just Player Patches"
-        description = "Morphe patches for Just (Video) Player"
+        name = "trustosas Patches"
+        description = "Morphe patches by trustosas"
         source = "git@github.com:trustosas/trustosas-patches.git"
         author = "Osakpolor"
         contact = "na"
