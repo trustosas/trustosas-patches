@@ -6,37 +6,42 @@ import app.morphe.patcher.methodCall
 import app.morphe.patcher.opcode
 import com.android.tools.smali.dexlib2.Opcode
 
+/*
+ * Just Player 0.218 is R8-obfuscated, so these names only match this version:
+ *   td0   = Utils            (td0.D  = Utils.getFileName(Context, Uri))
+ *   fx0   = merged Player.Listener (fx0.j = onMediaMetadataChanged, fx0.k = owner object)
+ *   tl0   = MediaMetadata    (tl0.a  = title)
+ *   PlayerActivity.z = titleView
+ * When the app updates, re-check these names (see the hook in TitleHook.java).
+ */
+
 /**
- * PlayerActivity.initializePlayer() builds the MediaItem metadata like this:
- *
- *   title = apiTitle != null ? apiTitle : Utils.getFileName(...);   <- first getFileName call
- *   ...
- *   titleView.setText(apiTitle != null ? apiTitle : Utils.getFileName(...));  <- second call
- *
- * Filter 0 matches the FIRST Utils.getFileName call in the method (the MediaItem one),
- * filter 1 is the move-result-object right after it.
+ * PlayerActivity.initializePlayer() (obfuscated name "h") calls getFileName twice:
+ *   1st: MediaItem title  ->  title = apiTitle != null ? apiTitle : getFileName(...)
+ *   2nd: titleView.setText(...)
+ * Filter 0 matches the FIRST call, filter 1 is the move-result-object right after it.
+ * The method name is obfuscated, so it is matched by its contents only.
  */
 object InitializePlayerFingerprint : Fingerprint(
     definingClass = "Lcom/brouken/player/PlayerActivity;",
-    name = "initializePlayer",
     returnType = "V",
     parameters = listOf(),
     filters = listOf(
         methodCall(
-            definingClass = "Lcom/brouken/player/Utils;",
-            name = "getFileName"
+            definingClass = "Ltd0;",
+            name = "D"
         ),
         opcode(Opcode.MOVE_RESULT_OBJECT, MatchAfterImmediately())
     )
 )
 
 /**
- * PlayerActivity.PlayerListener.onMediaMetadataChanged(MediaMetadata)
- * In the release build this is a synthetic stub that only calls the Player.Listener default.
+ * Player.Listener.onMediaMetadataChanged(MediaMetadata) in the merged listener class.
+ * In the release build this is only: iget-byte v0, v0, fx0->j ; return-void
  */
 object OnMediaMetadataChangedFingerprint : Fingerprint(
-    definingClass = "Lcom/brouken/player/PlayerActivity\$PlayerListener;",
-    name = "onMediaMetadataChanged",
+    definingClass = "Lfx0;",
+    name = "j",
     returnType = "V",
-    parameters = listOf("Landroidx/media3/common/MediaMetadata;")
+    parameters = listOf("Ltl0;")
 )

@@ -1,7 +1,6 @@
 package app.template.patches.justplayer
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
-import app.morphe.patcher.extensions.InstructionExtensions.removeInstruction
 import app.morphe.patcher.patch.ApkFileType
 import app.morphe.patcher.patch.AppTarget
 import app.morphe.patcher.patch.Compatibility
@@ -16,8 +15,8 @@ private val COMPATIBILITY_JUST_PLAYER = Compatibility(
     apkFileType = ApkFileType.APK,
     appIconColor = 0x1A1A1A, // Cosmetic only, change to taste.
     targets = listOf(
-        // null = any version, "lucky go" until upstream refactors this code.
-        AppTarget(version = null, isExperimental = true)
+        // Class/field names are R8-obfuscated and only valid for this exact version.
+        AppTarget(version = "0.218", isExperimental = true)
     )
 )
 
@@ -45,18 +44,13 @@ val useMediaTitleTagPatch = patch(
         }
 
         // 2. Update the on-screen title when the real metadata arrives.
-        //    The stub has no free registers, so p0 is reused (this -> this$0, the PlayerActivity)
-        //    and the stub's original call to the Player.Listener default is removed,
-        //    since it would otherwise receive the clobbered p0.
-        OnMediaMetadataChangedFingerprint.method.apply {
-            addInstructions(
-                0,
-                """
-                    iget-object p0, p0, Lcom/brouken/player/PlayerActivity${'$'}PlayerListener;->this${'$'}0:Lcom/brouken/player/PlayerActivity;
-                    invoke-static {p0, p1}, $EXTENSION_CLASS->onMediaMetadataChanged(Ljava/lang/Object;Ljava/lang/Object;)V
-                """
-            )
-            removeInstruction(2) // The original default-method call.
-        }
+        //    The release stub is just `iget-byte v0, v0, ...; return-void` (2 registers: p0 = listener,
+        //    p1 = MediaMetadata). Nothing is clobbered, so the hook call is simply put in front of it.
+        OnMediaMetadataChangedFingerprint.method.addInstructions(
+            0,
+            """
+                invoke-static {p0, p1}, $EXTENSION_CLASS->onMediaMetadataChanged(Ljava/lang/Object;Ljava/lang/Object;)V
+            """
+        )
     }
 }
