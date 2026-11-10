@@ -1,52 +1,64 @@
 package app.template.extension.justplayer;
 
+import android.content.Context;
+import android.database.Cursor;
+import android.media.MediaMetadataRetriever;
+import android.net.Uri;
+import android.provider.OpenableColumns;
 import android.text.TextUtils;
-import android.widget.TextView;
-
-import java.lang.reflect.Field;
 
 @SuppressWarnings("unused")
 public class TitleHook {
-    // Just Player 0.218 (R8-obfuscated). Update these when the app updates.
-    private static final String ACTIVITY_CLASS = "com.brouken.player.PlayerActivity";
-    private static final String LISTENER_OWNER_FIELD = "k"; // fx0.k  -> owning object
-    private static final String METADATA_TITLE_FIELD = "a"; // tl0.a  -> MediaMetadata.title
-    private static final String TITLE_VIEW_FIELD = "z";     // PlayerActivity.z -> titleView
-
-    private static Field ownerField;
-    private static Field titleField;
-    private static Field titleViewField;
 
     /**
-     * Injected at the start of the merged Player.Listener's onMediaMetadataChanged.
-     * The listener class is shared by several listeners, so first check the owner is PlayerActivity.
-     * Both parameters are Object so the extension needs no compile-time dependency on the app or media3.
+     * Replaces the app's getFileName(Context, Uri) for the on-screen title.
+     * Uses only Android framework APIs, so it does not depend on the app's obfuscated names.
+     * Returns the embedded title tag when present, otherwise the file name.
      */
-    public static void onMediaMetadataChanged(Object listener, Object mediaMetadata) {
+    public static String resolveTitle(Context context, Uri uri) {
         try {
-            if (listener == null || mediaMetadata == null) return;
-
-            if (ownerField == null) ownerField = accessible(listener.getClass(), LISTENER_OWNER_FIELD);
-            Object activity = ownerField.get(listener);
-            if (activity == null || !ACTIVITY_CLASS.equals(activity.getClass().getName())) return;
-
-            if (titleField == null) titleField = accessible(mediaMetadata.getClass(), METADATA_TITLE_FIELD);
-            Object title = titleField.get(mediaMetadata);
-            if (!(title instanceof CharSequence) || TextUtils.isEmpty((CharSequence) title)) return;
-
-            if (titleViewField == null) titleViewField = accessible(activity.getClass(), TITLE_VIEW_FIELD);
-            Object view = titleViewField.get(activity);
-            if (view instanceof TextView) {
-                ((TextView) view).setText((CharSequence) title);
-            }
+            String title = readEmbeddedTitle(context, uri);
+            if (!TextUtils.isEmpty(title)) return title;
         } catch (Throwable ignored) {
-            // Never crash playback over a title.
+            // Fall through to the file name.
+        }
+        return fileName(context, uri);
+    }
+
+    private static String readEmbeddedTitle(Context context, Uri uri) {
+        if (context == null || uri == null) return null;
+
+        // Local sources only: this runs on the main thread, so never touch the network.
+        String scheme = uri.getScheme();
+        if (!"content".equals(scheme) && !"file".equals(scheme)) return null;
+
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(context, uri);
+            return retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+        } finally {
+            try {
+                retriever.release();
+            } catch (Throwable ignored) {
+            }
         }
     }
 
-    private static Field accessible(Class<?> cls, String name) throws NoSuchFieldException {
-        Field field = cls.getDeclaredField(name);
-        field.setAccessible(true);
-        return field;
+    private static String fileName(Context context, Uri uri) {
+        if (uri == null) return null;
+        try {
+            if (context != null && "content".equals(uri.getScheme())) {
+                try (Cursor cursor = context.getContentResolver()
+                        .query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                    if (cursor != null && cursor.moveToFirst()) {
+                        String name = cursor.getString(0);
+                        if (!TextUtils.isEmpty(name)) return name;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        String last = uri.getLastPathSegment();
+        return last != null ? last : uri.toString();
     }
 }

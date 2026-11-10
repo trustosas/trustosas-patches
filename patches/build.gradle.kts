@@ -5,7 +5,7 @@ patches {
     about {
         name = "Just Player Patches"
         description = "Morphe patches for Just (Video) Player"
-        source = "git@github.com:UserXYZ/morphe-patches.git"
+        source = "git@github.com:trustosas/trustosas-patches.git"
         author = "Osakpolor"
         contact = "na"
         website = "na"

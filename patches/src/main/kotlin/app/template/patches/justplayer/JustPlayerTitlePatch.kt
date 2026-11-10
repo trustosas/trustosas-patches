@@ -1,10 +1,12 @@
 package app.template.patches.justplayer
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.ApkFileType
 import app.morphe.patcher.patch.AppTarget
 import app.morphe.patcher.patch.Compatibility
 import app.morphe.patcher.patch.patch
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 private const val EXTENSION_CLASS = "Lapp/template/extension/justplayer/TitleHook;"
@@ -15,8 +17,8 @@ private val COMPATIBILITY_JUST_PLAYER = Compatibility(
     apkFileType = ApkFileType.APK,
     appIconColor = 0x1A1A1A, // Cosmetic only, change to taste.
     targets = listOf(
-        // Class/field names are R8-obfuscated and only valid for this exact version.
-        AppTarget(version = "0.218", isExperimental = true)
+        // null = any version, "lucky go" until upstream refactors this code.
+        AppTarget(version = null, isExperimental = true)
     )
 )
 
@@ -32,7 +34,22 @@ val useMediaTitleTagPatch = patch(
     extendWith("extensions/extension.mpe")
 
     execute {
-        // 1. Stop forcing the filename as the MediaItem title.
+        // 1. Show the real title on screen too. Original: titleView.setText(... getFileName(ctx, uri))
+        //    The call is redirected to the extension, which reads the embedded title tag and falls
+        //    back to the filename. Same signature, so the registers and move-result stay untouched.
+        InitializePlayerFingerprint.let {
+            val call = it.instructionMatches[2]
+            val args = call.getInstruction<FiveRegisterInstruction>()
+
+            it.method.replaceInstruction(
+                call.index,
+                "invoke-static {v${args.registerC}, v${args.registerD}}, " +
+                    "$EXTENSION_CLASS->resolveTitle(Landroid/content/Context;Landroid/net/Uri;)Ljava/lang/String;"
+            )
+        }
+
+        // 2. Stop forcing the filename as the MediaItem title.
+        //    (Runs after step 1 on purpose: this inserts an instruction and would shift the indices.)
         //    Original: title = apiTitle != null ? apiTitle : Utils.getFileName(...)
         //    Patched:  the getFileName result is replaced with null, and the existing
         //    `if (title != null)` check then skips setting MediaMetadata entirely.
@@ -42,15 +59,5 @@ val useMediaTitleTagPatch = patch(
 
             it.method.addInstructions(moveResult.index + 1, "const/4 v$register, 0x0")
         }
-
-        // 2. Update the on-screen title when the real metadata arrives.
-        //    The release stub is just `iget-byte v0, v0, ...; return-void` (2 registers: p0 = listener,
-        //    p1 = MediaMetadata). Nothing is clobbered, so the hook call is simply put in front of it.
-        OnMediaMetadataChangedFingerprint.method.addInstructions(
-            0,
-            """
-                invoke-static {p0, p1}, $EXTENSION_CLASS->onMediaMetadataChanged(Ljava/lang/Object;Ljava/lang/Object;)V
-            """
-        )
     }
 }
