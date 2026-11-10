@@ -1,3 +1,9 @@
+## [1.0.0-dev.3](https://github.com/trustosas/trustosas-patches/compare/v1.0.0-dev.2...v1.0.0-dev.3) (2026-11-10)
+
+### 🐛 Bug Fixes
+
+* make Just Player title patch independent of obfuscated names ([13bbf78](https://github.com/trustosas/trustosas-patches/commit/13bbf78fb0d304f845c75c40d487a05b0e3890c9))
+
 ## [1.0.0-dev.2](https://github.com/trustosas/trustosas-patches/compare/v1.0.0-dev.1...v1.0.0-dev.2) (2026-11-10)
 
 ### 🐛 Bug Fixes
